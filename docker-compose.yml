@@ -1,0 +1,59 @@
+version: '2'
+services:
+
+  # The Laravel Application
+  app:
+    build:
+      context: ./
+
+      #control PHP modules
+      dockerfile: app.dockerfile
+
+      #that’s where the app code will be inside the container, so it’ll save us having to CD into that folder should we ever attach to the container. It will also make exec commands shorter
+    working_dir: /var/www
+
+    #We use a single volume definition ./:/var/www to mount the everything in the current directory on the host into /var/www in the container. This will allow us to make changes to our source code and have them reflected in the running application immediately.
+    volumes:
+      - ./:/var/www
+
+    #The environment variables DB_PORT & DB_HOST are set here to match up with the database container we’ll create shortly
+    environment:
+      - "DB_PORT=3306"
+      - "DB_HOST=database"
+
+  # The Nginx Web Server
+  web:
+    build:
+      context: ./
+      dockerfile: web.dockerfile
+    working_dir: /var/www
+
+    #to re-use what we defined in the PHP-FPM service above. Nginx container will inherit the /var/www directory.
+    volumes_from:
+      - app
+
+    #This is so that we can access 0.0.0.0:8080 whilst in development and won’t need to mess around with host names.
+    ports:
+      - 8080:80
+
+  # The MySQL Database
+  database:
+    image: mysql:5.6
+    volumes:
+      - dbdata:/var/lib/mysql
+
+    #Required by the MySql docker image.
+    #We used homestead as the database/user name & secret as the password as these values match what can be found in the default .env that ships with Laravel, meaning we won’t have to change it there.
+    environment:
+      - "MYSQL_DATABASE=laraveldb"
+      - "MYSQL_USER=laraveluser"
+      - "MYSQL_PASSWORD=laravelpass"
+      - "MYSQL_ROOT_PASSWORD=root"
+      
+      # Additional port mapping of 33061 on the host to the regular 3306 inside the container. 
+      # This is done solely to allow external tools easier access to the database whilst in development — it will not be needed in the production setup.
+    ports:
+        - "33061:3306"
+
+volumes:
+  dbdata:
